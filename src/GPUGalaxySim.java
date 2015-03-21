@@ -7,62 +7,109 @@
 
 
 
+import com.amd.aparapi.Kernel;
+import com.amd.aparapi.Range;
+import sun.applet.AppletViewerFactory;
+
 import java.awt.* ;
+import java.awt.Color;
+import java.util.Random;
+import java.util.concurrent.CyclicBarrier;
 import javax.swing.* ;
 
-public class Gravity {
+public class GPUGalaxySim extends Thread{
 
     // Size of simulation
-
     final static int N = 4000 ;  // Number of "stars"
     final static double BOX_WIDTH = 100.0 ;
 
 
     // Initial state
 
-    final static double RADIUS = 20.0 ;  // of randomly populated sphere
+    final static double RADIUS = 5.0 ;  // of randomly populated sphere
 
-    final static double ANGULAR_VELOCITY = 0.4 ;
+    final static double ANGULAR_VELOCITY = 0.4;
     // controls total angular momentum
 
 
     // Simulation
 
-    final static double DT = 0.002 ;  // Time step
+
 
 
     // Display
 
-    final static int WINDOW_SIZE = 800 ;
+    final static int WINDOW_SIZE =800 ;
     final static int DELAY = 0 ;
     final static int OUTPUT_FREQ = 2 ;
 
 
-    // Star positions
-    static double [] positionsX = new double [N] ;
-    static double [] positionsY = new double [N] ;
-    static double [] positionsZ = new double [N] ;
 
-    // Star velocities
-    static double [] velocitiesX = new double [N] ;
-    static double [] velocitiesY = new double [N] ;
-    static double [] velocitiesZ = new double [N] ;
-
-    // Star accelerations
-    static double [] accelerationsX = new double [N] ;
-    static double [] accelerationsY = new double [N] ;
-    static double [] accelerationsZ = new double [N] ;
 
 
     public static void main(String args []) throws Exception {
 
-        Display display = new Display() ;
+        // Star positions
+        final double [] positionsX = new double [N] ;
+        final double [] positionsY = new double [N] ;
+        final double [] positionsZ = new double [N] ;
 
-        // Define initial state of stars
+        // Star velocities
+        final double [] velocitiesX = new double [N] ;
+        final double [] velocitiesY = new double [N] ;
+        final double [] velocitiesZ = new double [N] ;
 
-        /*
+        // Star accelerations
+        final double [] accelerationsX = new double [N] ;
+        final double [] accelerationsY = new double [N] ;
+        final double [] accelerationsZ = new double [N] ;
 
-        // Randomly choose plane for net angular velocity
+        // Star masses
+        final double [] masses = new double [N];
+
+        final double DT = 0.002 ;  // Time step
+        final double G = 6.667 * Math.pow(10, -11);
+        final double AVG_DISTANCE = 3.784*Math.pow(10, 10);
+
+        Display display = new Display(positionsX, positionsY);
+
+        Kernel kernel = new Kernel(){
+            @Override public void run() {
+                int gid = getGlobalId();
+
+                accelerationsX[gid] = 0.0;
+                accelerationsY[gid] = 0.0;
+                accelerationsZ[gid] = 0.0;
+                double distanceX, distanceY, distanceZ;  // separations in positionsX and positionsY directions
+                double distanceXSqr, distanceYSqr, distanceZSqr, rSquared, r, rCubedInv, fx, fy, fz;
+
+                for (int j = 0; j < N; j++) {  // loop over all distinct pairs
+                    if (gid != j) {
+                        // Vector version of inverse square law
+                        distanceX = (positionsX[gid] - positionsX[j]);
+                        distanceY = (positionsY[gid] - positionsY[j]);
+                        distanceZ = (positionsZ[gid] - positionsZ[j]);
+                        distanceXSqr = distanceX * distanceX;
+                        distanceYSqr = distanceY * distanceY;
+                        distanceZSqr = distanceZ * distanceZ;
+                        rSquared = distanceXSqr + distanceYSqr + distanceZSqr;
+                        r = Math.sqrt(rSquared);
+                        rCubedInv = 1.0 / (rSquared * r);
+                        fx = -rCubedInv * distanceX;
+                        fy = -rCubedInv * distanceY;
+                        fz = -rCubedInv * distanceZ;
+
+                        accelerationsX[gid] += fx;  // add this force on to i's acceleration (mass = 1)
+                        accelerationsY[gid] += fy;
+                        accelerationsZ[gid] += fz;
+//                accelerationsX[j] -= fx;  // Newton's 3rd law
+//                accelerationsY[j] -= fy;
+//                accelerationsZ[j] -= fz;
+                    }
+                }
+
+            }
+        };
 
         double nx = 2 * Math.random() - 1 ;
         double ny = 2 * Math.random() - 1 ;
@@ -72,10 +119,8 @@ public class Gravity {
         ny *= norm ;
         nz *= norm ;
 
-        */
-
         // ... or just rotate in positionsX, positionsY plane
-        double nx = 0, ny = 0, nz = 1.0 ;
+        //double nx = 0, ny = 0, nz = 1.0 ;
 
         // ... or just rotate in positionsX, positionsZ plane
         //double nx = 0, ny = 1.0, nz = 0 ;
@@ -98,20 +143,26 @@ public class Gravity {
             velocitiesX[i] = ANGULAR_VELOCITY * (ny * relativePosZ - nz * relativePosY) ;
             velocitiesY[i] = ANGULAR_VELOCITY * (nz * relativePosX - nx * relativePosZ) ;
             velocitiesZ[i] = ANGULAR_VELOCITY * (nx * relativePosY - ny * relativePosX) ;
+
+            Random r = new Random();
+            double min = 1.65 * Math.pow(10, 29);
+            double max = 2.983 * Math.pow(10, 32);
+            masses[i] = r.nextDouble()*(max - min) + min;
         }
 
         long startTime = System.currentTimeMillis();
-        int iter = 0 ;
-        while(iter < 500) {
-
+        int iter = 0;
+        while(iter < 1000000000){
             if(iter % OUTPUT_FREQ == 0) {
                 System.out.println("iter = " + iter + ", time = " + iter * DT) ;
+                display.setPositions(positionsX, positionsY);
                 display.repaint() ;
-                Thread.sleep(DELAY) ;
+//                try {
+//                    Thread.sleep(3000);
+//                } catch (InterruptedException e) {
+//                    e.printStackTrace();
+//                }
             }
-
-            // Verlet integration:
-            // http://en.wikipedia.org/wiki/Verlet_integration#Velocity_Verlet
 
             double dtOver2 = 0.5 * DT;
             double dtSquaredOver2 = 0.5 * DT * DT;
@@ -126,7 +177,11 @@ public class Gravity {
                 velocitiesZ[i] += (accelerationsZ[i] * dtOver2);
             }
 
-            computeAccelerations();
+
+            kernel.execute(Range.create(N));
+
+
+
 
             for (int i = 0; i < N; i++) {
                 // finish updating velocity with new acceleration
@@ -135,23 +190,19 @@ public class Gravity {
                 velocitiesZ[i] += (accelerationsZ[i] * dtOver2);
             }
 
-            iter++ ;
+            iter++;
         }
+        kernel.dispose();
+
         System.out.println("Calculation completed in "
                 + (System.currentTimeMillis() - startTime) + " milliseconds");
     }
 
-    // Compute accelerations of all stars from current positions:
-    static void computeAccelerations() {
 
-        double distanceX, distanceY, distanceZ;  // separations in positionsX and positionsY directions
-        double distanceXSqr, distanceYSqr, distanceZSqr, rSquared, r, rCubedInv, fx, fy, fz;
 
-        for (int i = 0; i < N; i++) {
-            accelerationsX[i] = 0.0;
-            accelerationsY[i] = 0.0;
-            accelerationsZ[i] = 0.0;
-        }
+
+
+
 
         // Interaction forces (gravity)
         // This is where the program spends most of its time.
@@ -163,40 +214,18 @@ public class Gravity {
         // You can remove these assignments and extend the j loop to a fixed
         // upper bound of N, or, for extra credit, find a cleverer solution!)
 
-        for (int i = 1; i < N; i++) {
-            for (int j = 0; j < i; j++) {  // loop over all distinct pairs
 
-                // Vector version of inverse square law
-                distanceX = positionsX[i] - positionsX[j];
-                distanceY = positionsY[i] - positionsY[j];
-                distanceZ = positionsZ[i] - positionsZ[j];
-                distanceXSqr = distanceX * distanceX;
-                distanceYSqr = distanceY * distanceY;
-                distanceZSqr = distanceZ * distanceZ;
-                rSquared = distanceXSqr + distanceYSqr + distanceZSqr ;
-                r = Math.sqrt(rSquared) ;
-                rCubedInv = 1.0 / (rSquared * r) ;
-                fx = - rCubedInv * distanceX;
-                fy = - rCubedInv * distanceY;
-                fz = - rCubedInv * distanceZ;
-
-                accelerationsX[i] += fx;  // add this force on to i's acceleration (mass = 1)
-                accelerationsY[i] += fy;
-                accelerationsZ[i] += fz;
-                accelerationsX[j] -= fx;  // Newton's 3rd law
-                accelerationsY[j] -= fy;
-                accelerationsZ[j] -= fz;
-            }
-        }
-    }
 
 
     static class Display extends JPanel {
 
         static final double SCALE = WINDOW_SIZE / BOX_WIDTH ;
+        double [] positionsX, positionsY;
 
-        Display() {
+        Display(double [] positionsX, double [] positionsY) {
 
+            this.positionsX = positionsX;
+            this.positionsY = positionsY;
             setPreferredSize(new Dimension(WINDOW_SIZE, WINDOW_SIZE)) ;
 
             JFrame frame = new JFrame("MD");
@@ -206,13 +235,18 @@ public class Gravity {
             frame.setVisible(true);
         }
 
+        public void setPositions(double [] positionsX, double [] positionsY){
+            this.positionsX = positionsX;
+            this.positionsY = positionsY;
+        }
+
         public void paintComponent(Graphics g) {
             g.setColor(Color.BLACK) ;
             g.fillRect(0, 0, WINDOW_SIZE, WINDOW_SIZE) ;
             g.setColor(Color.WHITE) ;
             for(int i = 0 ; i < N ; i++) {
-                int gx = (int) (SCALE * positionsX[i]) ;
-                int gy = (int) (SCALE * positionsY[i]) ;
+                int gx = (int) (SCALE * this.positionsX[i]) ;
+                int gy = (int) (SCALE * this.positionsY[i]) ;
                 if(0 <= gx && gx < WINDOW_SIZE && 0 < gy && gy < WINDOW_SIZE) {
                     g.fillRect(gx, gy, 1, 1) ;
                 }
@@ -220,4 +254,4 @@ public class Gravity {
         }
     }
 }
-    
+

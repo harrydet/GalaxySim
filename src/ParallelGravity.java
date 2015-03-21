@@ -126,7 +126,7 @@ public class ParallelGravity extends Thread{
         int begin = me * B ;
         int end = begin + B ;
 
-        while(true){
+        while(iter < 500){
             if(iter % OUTPUT_FREQ == 0 && me == 0) {
                 System.out.println("iter = " + iter + ", time = " + iter * DT) ;
                 display.repaint() ;
