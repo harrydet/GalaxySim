@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="aparapi (2)">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/aparapi.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

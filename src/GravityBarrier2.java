@@ -7,42 +7,37 @@
 
 
 
-import sun.applet.AppletViewerFactory;
-
 import java.awt.* ;
 import java.awt.Color;
-import java.util.Random;
 import java.util.concurrent.CyclicBarrier;
 import javax.swing.* ;
 
-public class PhysicsGravity extends Thread{
+public class GravityBarrier2 extends Thread{
 
     // Size of simulation
-    final static int P = 8;
-    final static int N = 4000 ;  // Number of "stars"
+    final static int P = 2;
+    final static int N = 2000 ;  // Number of "stars"
     final static double BOX_WIDTH = 100.0 ;
 
 
     // Initial state
 
-    final static double RADIUS = 50 ;  // of randomly populated sphere
+    final static double RADIUS = 20.0 ;  // of randomly populated sphere
 
-    final static double ANGULAR_VELOCITY = 0.2;
+    final static double ANGULAR_VELOCITY = 0.4 ;
     // controls total angular momentum
 
 
     // Simulation
 
     final static double DT = 0.002 ;  // Time step
-    final static double G = 6.667 * Math.pow(10, -11);
-    final static double AVG_DISTANCE = 3.784*Math.pow(10, 10);
 
 
     // Display
 
-    final static int WINDOW_SIZE =800 ;
+    final static int WINDOW_SIZE = 800 ;
     final static int DELAY = 0 ;
-    final static int OUTPUT_FREQ = 1 ;
+    final static int OUTPUT_FREQ = 2 ;
 
 
     // Star positions
@@ -60,29 +55,18 @@ public class PhysicsGravity extends Thread{
     static double [] accelerationsY = new double [N] ;
     static double [] accelerationsZ = new double [N] ;
 
-    // Star masses
-    static double [] masses = new double [N];
-
     static CyclicBarrier barrier = new CyclicBarrier(P);
     private static Display display = new Display();
     int me;
 
-    public PhysicsGravity(int me){
+    public GravityBarrier2(int me){
         this.me = me;
     }
 
     public static void main(String args []) throws Exception {
 
-        double nx = 2 * Math.random() - 1 ;
-        double ny = 2 * Math.random() - 1 ;
-        double nz = 2 * Math.random() - 1 ;
-        double norm = 1.0 / Math.sqrt(nx * nx + ny * ny + nz * nz) ;
-        nx *= norm ;
-        ny *= norm ;
-        nz *= norm ;
-
         // ... or just rotate in positionsX, positionsY plane
-        //double nx = 0, ny = 0, nz = 1.0 ;
+        double nx = 0, ny = 0, nz = 1.0 ;
 
         // ... or just rotate in positionsX, positionsZ plane
         //double nx = 0, ny = 1.0, nz = 0 ;
@@ -105,16 +89,11 @@ public class PhysicsGravity extends Thread{
             velocitiesX[i] = ANGULAR_VELOCITY * (ny * relativePosZ - nz * relativePosY) ;
             velocitiesY[i] = ANGULAR_VELOCITY * (nz * relativePosX - nx * relativePosZ) ;
             velocitiesZ[i] = ANGULAR_VELOCITY * (nx * relativePosY - ny * relativePosX) ;
-
-            Random r = new Random();
-            double min = 1.65 * Math.pow(10, 29);
-            double max = 2.983 * Math.pow(10, 32);
-            masses[i] = r.nextDouble()*(max - min) + min;
         }
 
-        PhysicsGravity[] threads = new PhysicsGravity[P];
+        GravityBarrier4[] threads = new GravityBarrier4[P];
         for(int i = 0; i < P; i++){
-            threads[i] = new PhysicsGravity(i);
+            threads[i] = new GravityBarrier4(i);
             threads[i].start();
         }
 
@@ -145,7 +124,7 @@ public class PhysicsGravity extends Thread{
         int begin = me * B ;
         int end = begin + B ;
 
-        while(true){
+        while(iter < 500){
             if(iter % OUTPUT_FREQ == 0 && me == 0) {
                 System.out.println("iter = " + iter + ", time = " + iter * DT) ;
                 display.repaint() ;
@@ -168,13 +147,11 @@ public class PhysicsGravity extends Thread{
                 velocitiesY[i] += (accelerationsY[i] * dtOver2);
                 velocitiesZ[i] += (accelerationsZ[i] * dtOver2);
             }
+
+
+
             synch();
-
-
-
             computeAccelerations(begin, end);
-            synch();
-
 
 
 
@@ -184,8 +161,6 @@ public class PhysicsGravity extends Thread{
                 velocitiesY[i] += (accelerationsY[i] * dtOver2);
                 velocitiesZ[i] += (accelerationsZ[i] * dtOver2);
             }
-            synch();
-
             iter++;
         }
     }
@@ -218,22 +193,22 @@ public class PhysicsGravity extends Thread{
             for (int j = 0; j < N; j++) {  // loop over all distinct pairs
                 if (i != j) {
                     // Vector version of inverse square law
-                    distanceX = (positionsX[i] - positionsX[j]) * AVG_DISTANCE;
-                    distanceY = (positionsY[i] - positionsY[j]) * AVG_DISTANCE;
-                    distanceZ = (positionsZ[i] - positionsZ[j]) * AVG_DISTANCE;
+                    distanceX = positionsX[i] - positionsX[j];
+                    distanceY = positionsY[i] - positionsY[j];
+                    distanceZ = positionsZ[i] - positionsZ[j];
                     distanceXSqr = distanceX * distanceX;
                     distanceYSqr = distanceY * distanceY;
                     distanceZSqr = distanceZ * distanceZ;
                     rSquared = distanceXSqr + distanceYSqr + distanceZSqr;
                     r = Math.sqrt(rSquared);
                     rCubedInv = 1.0 / (rSquared * r);
-                    fx = -rCubedInv * distanceX * masses[i] * masses[j] * G;
-                    fy = -rCubedInv * distanceY * masses[i] * masses[j] * G;
-                    fz = -rCubedInv * distanceZ * masses[i] * masses[j] * G;
+                    fx = -rCubedInv * distanceX;
+                    fy = -rCubedInv * distanceY;
+                    fz = -rCubedInv * distanceZ;
 
-                    accelerationsX[i] += fx/masses[i];  // add this force on to i's acceleration (mass = 1)
-                    accelerationsY[i] += fy/masses[i];
-                    accelerationsZ[i] += fz/masses[i];
+                    accelerationsX[i] += fx;  // add this force on to i's acceleration (mass = 1)
+                    accelerationsY[i] += fy;
+                    accelerationsZ[i] += fz;
 //                accelerationsX[j] -= fx;  // Newton's 3rd law
 //                accelerationsY[j] -= fy;
 //                accelerationsZ[j] -= fz;

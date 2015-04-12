@@ -1,0 +1,31 @@
+<component name="libraryTable">
+  <library name="daemon">
+    <CLASSES>
+      <root url="jar://$USER_HOME$/Desktop/mpj-v0_35P02/lib/daemon.jar!/" />
+      <root url="jar://$USER_HOME$/Desktop/mpj-v0_35P02/lib/javax.servlet.jar!/" />
+      <root url="jar://$USER_HOME$/Desktop/mpj-v0_35P02/lib/loader1.jar!/" />
+      <root url="jar://$USER_HOME$/Desktop/mpj-v0_35P02/lib/loader2.jar!/" />
+      <root url="jar://$USER_HOME$/Desktop/mpj-v0_35P02/lib/log4j-1.2.11.jar!/" />
+      <root url="jar://$USER_HOME$/Desktop/mpj-v0_35P02/lib/mpi.jar!/" />
+      <root url="jar://$USER_HOME$/Desktop/mpj-v0_35P02/lib/mpiExp.jar!/" />
+      <root url="jar://$USER_HOME$/Desktop/mpj-v0_35P02/lib/mpj.jar!/" />
+      <root url="jar://$USER_HOME$/Desktop/mpj-v0_35P02/lib/mpjbuf.jar!/" />
+      <root url="jar://$USER_HOME$/Desktop/mpj-v0_35P02/lib/mpjdev.jar!/" />
+      <root url="jar://$USER_HOME$/Desktop/mpj-v0_35P02/lib/mxdev.jar!/" />
+      <root url="jar://$USER_HOME$/Desktop/mpj-v0_35P02/lib/niodev.jar!/" />
+      <root url="jar://$USER_HOME$/Desktop/mpj-v0_35P02/lib/org.mortbay.jetty.jar!/" />
+      <root url="jar://$USER_HOME$/Desktop/mpj-v0_35P02/lib/smpdev.jar!/" />
+      <root url="jar://$USER_HOME$/Desktop/mpj-v0_35P02/lib/starter.jar!/" />
+      <root url="jar://$USER_HOME$/Desktop/mpj-v0_35P02/lib/test.jar!/" />
+      <root url="jar://$USER_HOME$/Desktop/mpj-v0_35P02/lib/tools.jar!/" />
+      <root url="jar://$USER_HOME$/Desktop/mpj-v0_35P02/lib/wrapper.jar!/" />
+      <root url="jar://$USER_HOME$/Desktop/mpj-v0_35P02/lib/xdev.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <NATIVE>
+      <root url="file://$USER_HOME$/Desktop/mpj-v0_35P02/lib" />
+      <root url="file://$USER_HOME$/Desktop/mpj-v0_35P02/lib" />
+    </NATIVE>
+    <SOURCES />
+  </library>
+</component>

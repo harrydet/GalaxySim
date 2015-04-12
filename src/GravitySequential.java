@@ -10,11 +10,11 @@
 import java.awt.* ;
 import javax.swing.* ;
 
-public class Gravity {
+public class GravitySequential {
 
     // Size of simulation
 
-    final static int N = 4000 ;  // Number of "stars"
+    final static int N = 2000 ;  // Number of "stars"
     final static double BOX_WIDTH = 100.0 ;
 
 

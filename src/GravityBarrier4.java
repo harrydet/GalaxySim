@@ -12,10 +12,10 @@ import java.awt.Color;
 import java.util.concurrent.CyclicBarrier;
 import javax.swing.* ;
 
-public class ParallelGravity extends Thread{
+public class GravityBarrier4 extends Thread{
 
     // Size of simulation
-    final static int P = 1;
+    final static int P = 4;
     final static int N = 2000 ;  // Number of "stars"
     final static double BOX_WIDTH = 100.0 ;
 
@@ -59,7 +59,7 @@ public class ParallelGravity extends Thread{
     private static Display display = new Display();
     int me;
 
-    public ParallelGravity(int me){
+    public GravityBarrier4(int me){
         this.me = me;
     }
 

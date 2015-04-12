@@ -20,15 +20,15 @@ import javax.swing.* ;
 public class GPUGalaxySim extends Thread{
 
     // Size of simulation
-    final static int N = 4000 ;  // Number of "stars"
-    final static double BOX_WIDTH = 100.0 ;
+    final static int N = 2000 ;  // Number of "stars"
+    final static double BOX_WIDTH = 50.0 ;
 
 
     // Initial state
 
-    final static double RADIUS = 5.0 ;  // of randomly populated sphere
+    final static double RADIUS = 55;  // of randomly populated sphere
 
-    final static double ANGULAR_VELOCITY = 0.4;
+    final static double ANGULAR_VELOCITY = 1;
     // controls total angular momentum
 
 
@@ -41,7 +41,7 @@ public class GPUGalaxySim extends Thread{
 
     final static int WINDOW_SIZE =800 ;
     final static int DELAY = 0 ;
-    final static int OUTPUT_FREQ = 2 ;
+    final static int OUTPUT_FREQ = 1 ;
 
 
 
@@ -63,6 +63,10 @@ public class GPUGalaxySim extends Thread{
         final double [] accelerationsX = new double [N] ;
         final double [] accelerationsY = new double [N] ;
         final double [] accelerationsZ = new double [N] ;
+
+        final double blackHolePositionX = BOX_WIDTH * 0.5;
+        final double blackHolePositionY = BOX_WIDTH * 0.5;
+        final double blackHolePositionZ = BOX_WIDTH * 0.5;
 
         // Star masses
         final double [] masses = new double [N];
@@ -108,6 +112,25 @@ public class GPUGalaxySim extends Thread{
                     }
                 }
 
+                distanceX = (positionsX[gid] - blackHolePositionX);
+                distanceY = (positionsY[gid] - blackHolePositionY);
+                distanceZ = (positionsZ[gid] - blackHolePositionZ);
+
+                distanceXSqr = distanceX * distanceX;
+                distanceYSqr = distanceY * distanceY;
+                distanceZSqr = distanceZ * distanceZ;
+
+                rSquared = distanceXSqr + distanceYSqr + distanceZSqr;
+                r = Math.sqrt(rSquared);
+                rCubedInv = 1.0 / (rSquared * r);
+                fx = -rCubedInv * distanceX * Math.pow(10, 5);
+                fy = -rCubedInv * distanceY * Math.pow(10, 5);
+                fz = -rCubedInv * distanceZ * Math.pow(10, 5);
+
+                accelerationsX[gid] += fx;  // add this force on to i's acceleration (mass of black hole is equal to 10 ^ 6 * massOfStar)
+                accelerationsY[gid] += fy;
+                accelerationsZ[gid] += fz;
+
             }
         };
 
@@ -143,11 +166,6 @@ public class GPUGalaxySim extends Thread{
             velocitiesX[i] = ANGULAR_VELOCITY * (ny * relativePosZ - nz * relativePosY) ;
             velocitiesY[i] = ANGULAR_VELOCITY * (nz * relativePosX - nx * relativePosZ) ;
             velocitiesZ[i] = ANGULAR_VELOCITY * (nx * relativePosY - ny * relativePosX) ;
-
-            Random r = new Random();
-            double min = 1.65 * Math.pow(10, 29);
-            double max = 2.983 * Math.pow(10, 32);
-            masses[i] = r.nextDouble()*(max - min) + min;
         }
 
         long startTime = System.currentTimeMillis();
@@ -251,6 +269,10 @@ public class GPUGalaxySim extends Thread{
                     g.fillRect(gx, gy, 1, 1) ;
                 }
             }
+            int gx = (int) (  WINDOW_SIZE * 0.5);
+            int gy = (int) ( WINDOW_SIZE * 0.5);
+            g.setColor(Color.RED);
+            g.fillRect(gx, gy, 1, 1) ;
         }
     }
 }
