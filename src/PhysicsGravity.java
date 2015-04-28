@@ -7,35 +7,42 @@
 
 
 
+import sun.applet.AppletViewerFactory;
+
 import java.awt.* ;
+import java.awt.Color;
+import java.util.Random;
+import java.util.concurrent.CyclicBarrier;
 import javax.swing.* ;
 
-public class GravitySequential {
+public class PhysicsGravity extends Thread{
 
     // Size of simulation
-
-    final static int N = 2000 ;  // Number of "stars"
+    final static int P = 8;
+    final static int N = 4000 ;  // Number of "stars"
     final static double BOX_WIDTH = 100.0 ;
 
 
     // Initial state
 
-    final static double RADIUS = 20.0 ;  // of randomly populated sphere
+    final static double RADIUS = 50 ;  // of randomly populated sphere
 
-    final static double ANGULAR_VELOCITY = 0.4 ;
+    final static double ANGULAR_VELOCITY = 0.2;
     // controls total angular momentum
 
 
     // Simulation
 
     final static double DT = 0.002 ;  // Time step
+    final static double G = 6.667 * Math.pow(10, -11);
+    final static double AVG_DISTANCE = 3.784*Math.pow(10, 10);
 
 
     // Display
 
-    final static int WINDOW_SIZE = 800 ;
+    final static int WINDOW_SIZE =800 ;
     final static int DELAY = 0 ;
-    final static int OUTPUT_FREQ = 2 ;
+    final static int OUTPUT_FREQ = 1 ;
 
 
     // Star positions
@@ -53,16 +60,18 @@ public class GravitySequential {
     static double [] accelerationsY = new double [N] ;
     static double [] accelerationsZ = new double [N] ;
 
+    // Star masses
+    static double [] masses = new double [N];
+
+    static CyclicBarrier barrier = new CyclicBarrier(P);
+    private static Display display = new Display();
+    int me;
+
+    public PhysicsGravity(int me){
+        this.me = me;
+    }
 
     public static void main(String args []) throws Exception {
-
-        Display display = new Display() ;
-
-        // Define initial state of stars
-
-        /*
-
-        // Randomly choose plane for net angular velocity
 
         double nx = 2 * Math.random() - 1 ;
         double ny = 2 * Math.random() - 1 ;
@@ -72,10 +81,8 @@ public class GravitySequential {
         ny *= norm ;
         nz *= norm ;
 
-        */
-
         // ... or just rotate in positionsX, positionsY plane
-        double nx = 0, ny = 0, nz = 1.0 ;
+        //double nx = 0, ny = 0, nz = 1.0 ;
 
         // ... or just rotate in positionsX, positionsZ plane
         //double nx = 0, ny = 1.0, nz = 0 ;
@@ -98,24 +105,60 @@ public class GravitySequential {
             velocitiesX[i] = ANGULAR_VELOCITY * (ny * relativePosZ - nz * relativePosY) ;
             velocitiesY[i] = ANGULAR_VELOCITY * (nz * relativePosX - nx * relativePosZ) ;
             velocitiesZ[i] = ANGULAR_VELOCITY * (nx * relativePosY - ny * relativePosX) ;
+
+            Random r = new Random();
+            double min = 1.65 * Math.pow(10, 29);
+            double max = 2.983 * Math.pow(10, 32);
+            masses[i] = r.nextDouble()*(max - min) + min;
+        }
+
+        PhysicsGravity[] threads = new PhysicsGravity[P];
+        for(int i = 0; i < P; i++){
+            threads[i] = new PhysicsGravity(i);
+            threads[i].start();
         }
 
         long startTime = System.currentTimeMillis();
-        int iter = 0 ;
-        while(iter < 500) {
 
-            if(iter % OUTPUT_FREQ == 0) {
+        for(int i = 0; i < P; i++){
+            threads[i].join();
+        }
+
+        System.out.println("Calculation completed in "
+                + (System.currentTimeMillis() - startTime) + " milliseconds");
+
+    }
+
+    static void synch() {
+        try {
+            barrier.await();
+        } catch (Exception e) {
+            e.printStackTrace();
+            System.exit(1);
+        }
+    }
+
+    final static int B = N / P ;
+
+    public void run(){
+        int iter = 0 ;
+        int begin = me * B ;
+        int end = begin + B ;
+
+        while(true){
+            if(iter % OUTPUT_FREQ == 0 && me == 0) {
                 System.out.println("iter = " + iter + ", time = " + iter * DT) ;
                 display.repaint() ;
-                Thread.sleep(DELAY) ;
+//                try {
+//                    Thread.sleep(3000);
+//                } catch (InterruptedException e) {
+//                    e.printStackTrace();
+//                }
             }
-
-            // Verlet integration:
-            // http://en.wikipedia.org/wiki/Verlet_integration#Velocity_Verlet
 
             double dtOver2 = 0.5 * DT;
             double dtSquaredOver2 = 0.5 * DT * DT;
-            for (int i = 0; i < N; i++) {
+            for (int i = begin; i < end; i++) {
                 // update position
                 positionsX[i] += (velocitiesX[i] * DT) + (accelerationsX[i] * dtSquaredOver2);
                 positionsY[i] += (velocitiesY[i] * DT) + (accelerationsY[i] * dtSquaredOver2);
@@ -125,24 +168,30 @@ public class GravitySequential {
                 velocitiesY[i] += (accelerationsY[i] * dtOver2);
                 velocitiesZ[i] += (accelerationsZ[i] * dtOver2);
             }
+            synch();
 
-            computeAccelerations();
 
-            for (int i = 0; i < N; i++) {
+
+            computeAccelerations(begin, end);
+            synch();
+
+
+
+
+            for (int i = begin; i < end; i++) {
                 // finish updating velocity with new acceleration
                 velocitiesX[i] += (accelerationsX[i] * dtOver2);
                 velocitiesY[i] += (accelerationsY[i] * dtOver2);
                 velocitiesZ[i] += (accelerationsZ[i] * dtOver2);
             }
+            synch();
 
-            iter++ ;
+            iter++;
         }
-        System.out.println("Calculation completed in "
-                + (System.currentTimeMillis() - startTime) + " milliseconds");
     }
 
     // Compute accelerations of all stars from current positions:
-    static void computeAccelerations() {
+    static void computeAccelerations(int begin, int end) {
 
         double distanceX, distanceY, distanceZ;  // separations in positionsX and positionsY directions
         double distanceXSqr, distanceYSqr, distanceZSqr, rSquared, r, rCubedInv, fx, fy, fz;
@@ -152,6 +201,8 @@ public class GravitySequential {
             accelerationsY[i] = 0.0;
             accelerationsZ[i] = 0.0;
         }
+
+
 
         // Interaction forces (gravity)
         // This is where the program spends most of its time.
@@ -163,29 +214,30 @@ public class GravitySequential {
         // You can remove these assignments and extend the j loop to a fixed
         // upper bound of N, or, for extra credit, find a cleverer solution!)
 
-        for (int i = 1; i < N; i++) {
-            for (int j = 0; j < i; j++) {  // loop over all distinct pairs
+        for (int i = begin; i < end; i++) {
+            for (int j = 0; j < N; j++) {  // loop over all distinct pairs
+                if (i != j) {
+                    // Vector version of inverse square law
+                    distanceX = (positionsX[i] - positionsX[j]) * AVG_DISTANCE;
+                    distanceY = (positionsY[i] - positionsY[j]) * AVG_DISTANCE;
+                    distanceZ = (positionsZ[i] - positionsZ[j]) * AVG_DISTANCE;
+                    distanceXSqr = distanceX * distanceX;
+                    distanceYSqr = distanceY * distanceY;
+                    distanceZSqr = distanceZ * distanceZ;
+                    rSquared = distanceXSqr + distanceYSqr + distanceZSqr;
+                    r = Math.sqrt(rSquared);
+                    rCubedInv = 1.0 / (rSquared * r);
+                    fx = -rCubedInv * distanceX * masses[i] * masses[j] * G;
+                    fy = -rCubedInv * distanceY * masses[i] * masses[j] * G;
+                    fz = -rCubedInv * distanceZ * masses[i] * masses[j] * G;
 
-                // Vector version of inverse square law
-                distanceX = positionsX[i] - positionsX[j];
-                distanceY = positionsY[i] - positionsY[j];
-                distanceZ = positionsZ[i] - positionsZ[j];
-                distanceXSqr = distanceX * distanceX;
-                distanceYSqr = distanceY * distanceY;
-                distanceZSqr = distanceZ * distanceZ;
-                rSquared = distanceXSqr + distanceYSqr + distanceZSqr ;
-                r = Math.sqrt(rSquared) ;
-                rCubedInv = 1.0 / (rSquared * r) ;
-                fx = - rCubedInv * distanceX;
-                fy = - rCubedInv * distanceY;
-                fz = - rCubedInv * distanceZ;
-
-                accelerationsX[i] += fx;  // add this force on to i's acceleration (mass = 1)
-                accelerationsY[i] += fy;
-                accelerationsZ[i] += fz;
-                accelerationsX[j] -= fx;  // Newton's 3rd law
-                accelerationsY[j] -= fy;
-                accelerationsZ[j] -= fz;
+                    accelerationsX[i] += fx/masses[i];  // add this force on to i's acceleration (mass = 1)
+                    accelerationsY[i] += fy/masses[i];
+                    accelerationsZ[i] += fz/masses[i];
+//                accelerationsX[j] -= fx;  // Newton's 3rd law
+//                accelerationsY[j] -= fy;
+//                accelerationsZ[j] -= fz;
+                }
             }
         }
     }

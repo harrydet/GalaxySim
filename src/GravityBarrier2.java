@@ -16,7 +16,7 @@ public class GravityBarrier2 extends Thread{
 
     // Size of simulation
     final static int P = 2;
-    final static int N = 2000 ;  // Number of "stars"
+    final static int N = 4000 ;  // Number of "stars"
     final static double BOX_WIDTH = 100.0 ;
 
 
@@ -91,9 +91,9 @@ public class GravityBarrier2 extends Thread{
             velocitiesZ[i] = ANGULAR_VELOCITY * (nx * relativePosY - ny * relativePosX) ;
         }
 
-        GravityBarrier4[] threads = new GravityBarrier4[P];
+        GravityBarrier2[] threads = new GravityBarrier2[P];
         for(int i = 0; i < P; i++){
-            threads[i] = new GravityBarrier4(i);
+            threads[i] = new GravityBarrier2(i);
             threads[i].start();
         }
 
@@ -124,7 +124,7 @@ public class GravityBarrier2 extends Thread{
         int begin = me * B ;
         int end = begin + B ;
 
-        while(iter < 500){
+        while(iter < 1000){
             if(iter % OUTPUT_FREQ == 0 && me == 0) {
                 System.out.println("iter = " + iter + ", time = " + iter * DT) ;
                 display.repaint() ;

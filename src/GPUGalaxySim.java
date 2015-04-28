@@ -9,26 +9,25 @@
 
 import com.amd.aparapi.Kernel;
 import com.amd.aparapi.Range;
-import sun.applet.AppletViewerFactory;
+import com.amd.aparapi.device.Device;
 
 import java.awt.* ;
 import java.awt.Color;
 import java.util.Random;
-import java.util.concurrent.CyclicBarrier;
 import javax.swing.* ;
 
-public class GPUGalaxySim extends Thread{
+public class GPUGalaxySim{
 
     // Size of simulation
-    final static int N = 2000 ;  // Number of "stars"
-    final static double BOX_WIDTH = 50.0 ;
+    final static int N = 4000 ;  // Number of "stars"
+    final static double BOX_WIDTH = 100;
 
 
     // Initial state
 
-    final static double RADIUS = 55;  // of randomly populated sphere
+    final static double RADIUS = 20 ;  // of randomly populated sphere
 
-    final static double ANGULAR_VELOCITY = 1;
+    final static double ANGULAR_VELOCITY = 0.4;
     // controls total angular momentum
 
 
@@ -39,7 +38,7 @@ public class GPUGalaxySim extends Thread{
 
     // Display
 
-    final static int WINDOW_SIZE =800 ;
+    final static int WINDOW_SIZE =800  ;
     final static int DELAY = 0 ;
     final static int OUTPUT_FREQ = 1 ;
 
@@ -48,6 +47,11 @@ public class GPUGalaxySim extends Thread{
 
 
     public static void main(String args []) throws Exception {
+
+        Device gpu1 = Device.firstGPU();
+        Device gpu2 = Device.best();
+        System.out.println(gpu1.toString());
+        System.out.println(gpu2.toString());
 
         // Star positions
         final double [] positionsX = new double [N] ;
@@ -68,16 +72,15 @@ public class GPUGalaxySim extends Thread{
         final double blackHolePositionY = BOX_WIDTH * 0.5;
         final double blackHolePositionZ = BOX_WIDTH * 0.5;
 
-        // Star masses
-        final double [] masses = new double [N];
+        final double BLACK_HOLE_SIZE = 0;
+
+
 
         final double DT = 0.002 ;  // Time step
-        final double G = 6.667 * Math.pow(10, -11);
-        final double AVG_DISTANCE = 3.784*Math.pow(10, 10);
 
         Display display = new Display(positionsX, positionsY);
 
-        Kernel kernel = new Kernel(){
+        final Kernel kernel1 = new Kernel(){
             @Override public void run() {
                 int gid = getGlobalId();
 
@@ -112,38 +115,60 @@ public class GPUGalaxySim extends Thread{
                     }
                 }
 
-                distanceX = (positionsX[gid] - blackHolePositionX);
-                distanceY = (positionsY[gid] - blackHolePositionY);
-                distanceZ = (positionsZ[gid] - blackHolePositionZ);
 
-                distanceXSqr = distanceX * distanceX;
-                distanceYSqr = distanceY * distanceY;
-                distanceZSqr = distanceZ * distanceZ;
-
-                rSquared = distanceXSqr + distanceYSqr + distanceZSqr;
-                r = Math.sqrt(rSquared);
-                rCubedInv = 1.0 / (rSquared * r);
-                fx = -rCubedInv * distanceX * Math.pow(10, 5);
-                fy = -rCubedInv * distanceY * Math.pow(10, 5);
-                fz = -rCubedInv * distanceZ * Math.pow(10, 5);
-
-                accelerationsX[gid] += fx;  // add this force on to i's acceleration (mass of black hole is equal to 10 ^ 6 * massOfStar)
-                accelerationsY[gid] += fy;
-                accelerationsZ[gid] += fz;
 
             }
         };
 
-        double nx = 2 * Math.random() - 1 ;
+        final Kernel kernel2 = new Kernel(){
+            @Override public void run() {
+                int gid = getGlobalId() + N/2;
+
+                accelerationsX[gid] = 0.0;
+                accelerationsY[gid] = 0.0;
+                accelerationsZ[gid] = 0.0;
+                double distanceX2, distanceY2, distanceZ2;  // separations in positionsX and positionsY directions
+                double distanceXSqr2, distanceYSqr2, distanceZSqr2, rSquared2, r2, rCubedInv2, fx2, fy2, fz2;
+
+                for (int j = 0; j < N; j++) {  // loop over all distinct pairs
+                    if (gid != j) {
+                        // Vector version of inverse square law
+                        distanceX2 = (positionsX[gid] - positionsX[j]);
+                        distanceY2 = (positionsY[gid] - positionsY[j]);
+                        distanceZ2 = (positionsZ[gid] - positionsZ[j]);
+                        distanceXSqr2 = distanceX2 * distanceX2;
+                        distanceYSqr2 = distanceY2 * distanceY2;
+                        distanceZSqr2 = distanceZ2 * distanceZ2;
+                        rSquared2 = distanceXSqr2 + distanceYSqr2 + distanceZSqr2;
+                        r2 = Math.sqrt(rSquared2);
+                        rCubedInv2 = 1.0 / (rSquared2 * r2);
+                        fx2 = -rCubedInv2 * distanceX2;
+                        fy2 = -rCubedInv2 * distanceY2;
+                        fz2 = -rCubedInv2 * distanceZ2;
+
+                        accelerationsX[gid] += fx2;  // add this force on to i's acceleration (mass = 1)
+                        accelerationsY[gid] += fy2;
+                        accelerationsZ[gid] += fz2;
+//                accelerationsX[j] -= fx;  // Newton's 3rd law
+//                accelerationsY[j] -= fy;
+//                accelerationsZ[j] -= fz;
+                    }
+                }
+
+
+            }
+        };
+
+        /*double nx = 2 * Math.random() - 1 ;
         double ny = 2 * Math.random() - 1 ;
         double nz = 2 * Math.random() - 1 ;
         double norm = 1.0 / Math.sqrt(nx * nx + ny * ny + nz * nz) ;
         nx *= norm ;
         ny *= norm ;
-        nz *= norm ;
+        nz *= norm ;*/
 
         // ... or just rotate in positionsX, positionsY plane
-        //double nx = 0, ny = 0, nz = 1.0 ;
+        double nx = 0, ny = 0, nz = 1.0 ;
 
         // ... or just rotate in positionsX, positionsZ plane
         //double nx = 0, ny = 1.0, nz = 0 ;
@@ -151,35 +176,40 @@ public class GPUGalaxySim extends Thread{
         for(int i = 0 ; i < N ; i++) {
 
             // Place star randomly in sphere of specified radius
-            double relativePosX, relativePosY, relativePosZ, radiusCheck ;
+            double relativePosX, relativePosY, relativePosZ, radiusCheck;
             do {
-                relativePosX = (2 * Math.random() - 1) * RADIUS ;
-                relativePosY = (2 * Math.random() - 1) * RADIUS ;
-                relativePosZ = (2 * Math.random() - 1) * RADIUS ;
-                radiusCheck = Math.sqrt(relativePosX * relativePosX + relativePosY * relativePosY + relativePosZ * relativePosZ) ;
-            } while(radiusCheck > RADIUS) ;
+                relativePosX = (2 * Math.random() - 1) * RADIUS;
+                relativePosY = (2 * Math.random() - 1) * RADIUS;
+                relativePosZ = (2 * Math.random() - 1) * RADIUS;
+                radiusCheck = Math.sqrt(relativePosX * relativePosX + relativePosY * relativePosY + relativePosZ * relativePosZ);
+            } while (radiusCheck > RADIUS);
 
-            positionsX[i] = 0.5 * BOX_WIDTH + relativePosX ;
-            positionsY[i] = 0.5 * BOX_WIDTH + relativePosY ;
-            positionsZ[i] = 0.5 * BOX_WIDTH + relativePosZ ;
 
-            velocitiesX[i] = ANGULAR_VELOCITY * (ny * relativePosZ - nz * relativePosY) ;
-            velocitiesY[i] = ANGULAR_VELOCITY * (nz * relativePosX - nx * relativePosZ) ;
-            velocitiesZ[i] = ANGULAR_VELOCITY * (nx * relativePosY - ny * relativePosX) ;
+            positionsX[i] = 0.5 * BOX_WIDTH + relativePosX;
+            positionsY[i] = 0.5 * BOX_WIDTH + relativePosY;
+            positionsZ[i] = 0.5 * BOX_WIDTH + relativePosZ;
+
+            velocitiesX[i] = ANGULAR_VELOCITY * (ny * relativePosZ - nz * relativePosY);
+            velocitiesY[i] = ANGULAR_VELOCITY * (nz * relativePosX - nx * relativePosZ);
+            velocitiesZ[i] = ANGULAR_VELOCITY * (nx * relativePosY - ny * relativePosX);
+
         }
 
         long startTime = System.currentTimeMillis();
         int iter = 0;
-        while(iter < 1000000000){
+
+        final  Range range1 = gpu1.createRange(N/2);
+        final Range range2 = gpu2.createRange(N/2);
+        boolean alt = true;
+
+
+        while(iter < 1000){
             if(iter % OUTPUT_FREQ == 0) {
-                System.out.println("iter = " + iter + ", time = " + iter * DT) ;
+                //System.out.println("iter = " + iter + ", time = " + iter * DT) ;
+                //System.out.println("Black hole mass: " + BLACK_HOLE_MASS[0]) ;
                 display.setPositions(positionsX, positionsY);
                 display.repaint() ;
-//                try {
-//                    Thread.sleep(3000);
-//                } catch (InterruptedException e) {
-//                    e.printStackTrace();
-//                }
+
             }
 
             double dtOver2 = 0.5 * DT;
@@ -195,11 +225,8 @@ public class GPUGalaxySim extends Thread{
                 velocitiesZ[i] += (accelerationsZ[i] * dtOver2);
             }
 
-
-            kernel.execute(Range.create(N));
-
-
-
+            kernel1.execute(range1);
+            kernel2.execute(range2);
 
             for (int i = 0; i < N; i++) {
                 // finish updating velocity with new acceleration
@@ -209,16 +236,14 @@ public class GPUGalaxySim extends Thread{
             }
 
             iter++;
+            alt = !alt;
+
+
         }
-        kernel.dispose();
 
         System.out.println("Calculation completed in "
                 + (System.currentTimeMillis() - startTime) + " milliseconds");
     }
-
-
-
-
 
 
 
@@ -237,7 +262,7 @@ public class GPUGalaxySim extends Thread{
 
     static class Display extends JPanel {
 
-        static final double SCALE = WINDOW_SIZE / BOX_WIDTH ;
+        static final double SCALEX = WINDOW_SIZE / BOX_WIDTH ;
         double [] positionsX, positionsY;
 
         Display(double [] positionsX, double [] positionsY) {
@@ -245,6 +270,7 @@ public class GPUGalaxySim extends Thread{
             this.positionsX = positionsX;
             this.positionsY = positionsY;
             setPreferredSize(new Dimension(WINDOW_SIZE, WINDOW_SIZE)) ;
+
 
             JFrame frame = new JFrame("MD");
             frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -263,16 +289,17 @@ public class GPUGalaxySim extends Thread{
             g.fillRect(0, 0, WINDOW_SIZE, WINDOW_SIZE) ;
             g.setColor(Color.WHITE) ;
             for(int i = 0 ; i < N ; i++) {
-                int gx = (int) (SCALE * this.positionsX[i]) ;
-                int gy = (int) (SCALE * this.positionsY[i]) ;
+                int gx = (int) (SCALEX * this.positionsX[i]) ;
+                int gy = (int) (SCALEX * this.positionsY[i]) ;
                 if(0 <= gx && gx < WINDOW_SIZE && 0 < gy && gy < WINDOW_SIZE) {
+                    if(i > N/2){
+                        g.setColor(Color.RED);
+                    } else {
+                        g.setColor(Color.YELLOW);
+                    }
                     g.fillRect(gx, gy, 1, 1) ;
                 }
             }
-            int gx = (int) (  WINDOW_SIZE * 0.5);
-            int gy = (int) ( WINDOW_SIZE * 0.5);
-            g.setColor(Color.RED);
-            g.fillRect(gx, gy, 1, 1) ;
         }
     }
 }
